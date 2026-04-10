@@ -396,6 +396,8 @@ let dangerEffect = 0;
 let combo = 0;
 let comboTimer = 0;
 let gameRunning = false;
+let kangarooActive = false;
+let kangarooTimer = 0;
 
 let displayWidth, displayHeight;
 const eatSound = new Audio("https://raw.githubusercontent.com/luana-76/imgHello/main/comendo.mp3");
@@ -524,17 +526,18 @@ async function startGame(selectedMode){
   }
 
   // primeiro spawn (10s)
+// primeiro spawn depois de 1 minuto (60s)
 setTimeout(()=>{
   spawnBoss();
 
-  // depois spawn a cada 20s
+  // depois reaparece a cada 40s
   bossInterval = setInterval(()=>{
-    if(!bossActive){ // evita spawn duplicado
+    if(!bossActive){
       spawnBoss();
     }
-  }, 20000);
+  }, 40000);
 
-}, 10000);
+}, 60000); // ⏱️ 1 minuto
 
 }
 
@@ -550,6 +553,25 @@ async function requestCamera(){
 function setDir(dir){
   lastDirection = dir;
 }
+function drawEgg(x, y){
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.ellipse(
+    x + box/2,
+    y + box/2,
+    box * 0.3,
+    box * 0.4,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  ctx.strokeStyle = "#ddd";
+  ctx.stroke();
+}
+let foodType = "cookie"; // cookie | egg
+
 
 function randomFood(){
   const maxCols = Math.floor(window.innerWidth / box);
@@ -563,6 +585,9 @@ function randomFood(){
       y: Math.floor(Math.random() * maxRows) * box
     };
   }while(snake.some(s => s.x === newFood.x && s.y === newFood.y));
+
+  // 🥚 30% de chance de ser ovo
+  foodType = Math.random() < 0.3 ? "egg" : "cookie";
 
   return newFood;
 }
@@ -675,15 +700,23 @@ function draw(){
 
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
+  if(foodType === "egg"){
+  drawEgg(food.x, food.y);
+}else{
   drawCookie(food.x, food.y);
+}
 
-  snake.forEach((s,i)=>{
-    if(i===0){
-      drawHelloKitty(s.x,s.y);
+snake.forEach((s,i)=>{
+  if(i === 0){
+    if(kangarooActive){
+      drawKittyOnKangaroo(s.x, s.y);
     }else{
-      drawCart(s.x, s.y);
+      drawHelloKitty(s.x, s.y);
     }
-  });
+  }else{
+    drawCart(s.x, s.y);
+  }
+});
 
   ctx.fillStyle="#fff";
   ctx.font = "28px Arial";
@@ -708,13 +741,16 @@ function draw(){
   }
 
   // 🔥 COMIDA
- if(headX===food.x && headY===food.y){
+if(headX === food.x && headY === food.y){
+
   score++;
   document.getElementById("finalScore").innerText = "Score: " + score;
-  combo++;
-  comboTimer = Date.now();
 
-  shake = 5; // 💥 impacto
+  // 🦘 só ativa se for OVO
+  if(foodType === "egg"){
+    kangarooActive = true;
+    kangarooTimer = Date.now();
+  }
 
   eatSound.currentTime = 0;
   eatSound.play();
@@ -760,20 +796,22 @@ if(bossActive && boss){
     let futureX = target.x;
     let futureY = target.y;
 
-    if(lastDirection === "LEFT") futureX -= box * 5;
-    if(lastDirection === "RIGHT") futureX += box * 5;
-    if(lastDirection === "UP") futureY -= box * 5;
-    if(lastDirection === "DOWN") futureY += box * 5;
+    //Prever 2 blocos a frente
+    if(lastDirection === "LEFT") futureX -= box * 2;
+    if(lastDirection === "RIGHT") futureX += box * 2;
+    if(lastDirection === "UP") futureY -= box * 2;
+    if(lastDirection === "DOWN") futureY += box * 2;
+
 
     // ⚡ dificuldade progressiva
     let timeAlive = (now - bossStartTime) / 1000;
-    let speed = 0.25 + (timeAlive * 0.02);
+    let speed = 0.15 + (timeAlive * 0.015);
 
     // 💥 DASH CONTROLADO
 
     if(now > boss.dashCooldown){
       boss.isDashing = true;
-      boss.dashCooldown = now + 2000;
+      boss.dashCooldown = now + 4000;
       boss.dashEnd = now + 300;
 
       shake = 10; // 💥 ativa tremor
@@ -781,7 +819,7 @@ if(bossActive && boss){
 
     if(now > boss.dashCooldown){
       boss.isDashing = true;
-      boss.dashCooldown = now + 2000;
+      boss.dashCooldown = now + 4000;
       boss.dashEnd = now + 300;
     }
 
@@ -855,6 +893,10 @@ if(dangerEffect > 0){
 
 if(shake > 0){
   ctx.restore();
+}
+
+if(kangarooActive && Date.now() - kangarooTimer > 5000){
+  kangarooActive = false;
 }
 
 }
@@ -951,6 +993,41 @@ function getControlsArea(){
 
   return controls.getBoundingClientRect();
 }
+
+function drawKangaroo(x, y){
+  const size = box;
+
+  // corpo
+  ctx.fillStyle = "#c68642";
+  ctx.beginPath();
+  ctx.ellipse(x + size/2, y + size*0.65, size*0.45, size*0.28, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // cabeça
+  ctx.beginPath();
+  ctx.ellipse(x + size*0.15, y + size*0.55, size*0.18, size*0.15, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // orelha
+  ctx.beginPath();
+  ctx.ellipse(x + size*0.1, y + size*0.3, size*0.08, size*0.2, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // rabo
+  ctx.beginPath();
+  ctx.ellipse(x + size*0.9, y + size*0.75, size*0.4, size*0.1, 0.3, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawKittyOnKangaroo(x, y){
+  drawKangaroo(x, y + box * 0.15);
+  drawHelloKitty(x + box * 0.15, y - box * 0.1);
+}
+
+
+
+
+
 </script>
 
 </body>
